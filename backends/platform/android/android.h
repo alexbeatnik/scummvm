@@ -153,6 +153,10 @@ private:
 	int _touchpad_scale;  // Used in events.cpp
 	int _trackball_scale; // Used in events.cpp
 	int _dpad_scale;      // Used in events.cpp
+	// DPAD center long press in games: it stays held after release until the next press (see events.cpp)
+	bool _dpadCenterLongPress;
+	bool _dpadCenterLatched;
+	bool _dpadCenterSkipUp;
 	int _joystick_scale;  // TODO This seems currently unused. Is it needed?
 //	int _fingersDown;
 	int _firstPointerId;

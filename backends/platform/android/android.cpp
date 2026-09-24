@@ -200,6 +200,9 @@ OSystem_Android::OSystem_Android() :
 	_touch_mode(TOUCH_MODE_TOUCHPAD),
 	_touchpad_scale(66),
 	_dpad_scale(4),
+	_dpadCenterLongPress(false),
+	_dpadCenterLatched(false),
+	_dpadCenterSkipUp(false),
 //	_fingersDown(0),
 	_firstPointerId(-1),
 	_secondPointerId(-1),
@@ -458,6 +461,8 @@ void OSystem_Android::engineInit() {
 
 void OSystem_Android::engineDone() {
 	_engineRunning = false;
+	_dpadCenterLongPress = false;
+	_dpadCenterLatched = false;
 	updateOnScreenControls();
 	JNI::setCurrentGame("");
 }
@@ -752,6 +757,22 @@ Common::KeymapperDefaultBindings *OSystem_Android::getKeymapperDefaultBindings()
 	keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, Common::kStandardActionMoveDown, "DOWN");
 	keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, Common::kStandardActionMoveLeft, "LEFT");
 	keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, Common::kStandardActionMoveRight, "RIGHT");
+
+	// The same goes for games: "engine-default" maps the DPAD directions to the keypad arrows, and since game
+	// keymaps are looked up before the global one, the virtual mouse bindings above never got the DPAD in game.
+	// On devices whose only input is a DPAD (eg. keypad phones, TV remotes) the cursor could not be moved at all.
+	// Engines with their own DPAD bindings (eg. the Full Throttle bike fights) keep them.
+	// DPAD center and "#" click, so that point-and-click games are playable with the DPAD alone.
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionMoveUp, "");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionMoveDown, "");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionMoveLeft, "");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionMoveRight, "");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionLeftClick, "MOUSE_LEFT");
+	keymapperDefaultBindings->addDefaultBinding("engine-default", Common::kStandardActionLeftClick, "JOY_A");
+	keymapperDefaultBindings->addDefaultBinding("engine-default", Common::kStandardActionLeftClick, "JOY_CENTER");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionRightClick, "MOUSE_RIGHT");
+	keymapperDefaultBindings->addDefaultBinding("engine-default", Common::kStandardActionRightClick, "JOY_B");
+	keymapperDefaultBindings->addDefaultBinding("engine-default", Common::kStandardActionRightClick, "HASH");
 
 	return keymapperDefaultBindings;
 }

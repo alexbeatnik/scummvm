@@ -1243,9 +1243,43 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 	case JE_GAMEPAD:
 		switch (arg1) {
 		case AKEY_EVENT_ACTION_DOWN:
+			if (arg5 > 0) {
+				// Android repeats a held key, DPAD and gamepad buttons included. Joystick buttons have no
+				// repeats in ScummVM, and each repeat would read as a fresh press: holding DPAD center
+				// (left click in games) opened the Full Throttle verb coin and closed it right away.
+				// The first repeat comes after the long-press timeout, which arms the latch below.
+				if (arg2 == AKEYCODE_DPAD_CENTER && arg5 == 1)
+					_dpadCenterLongPress = true;
+				return;
+			}
+			if (arg2 == AKEYCODE_DPAD_CENTER) {
+				if (_dpadCenterLatched) {
+					// The press after a latched long press releases the button: in Full Throttle this
+					// picks the verb under the cursor, or closes the verb coin over an empty spot.
+					_dpadCenterLatched = false;
+					_dpadCenterSkipUp = true;
+					ev0.type = Common::EVENT_JOYBUTTON_UP;
+					break;
+				}
+				_dpadCenterLongPress = false;
+			}
 			ev0.type = Common::EVENT_JOYBUTTON_DOWN;
 			break;
 		case AKEY_EVENT_ACTION_UP:
+			if (arg2 == AKEYCODE_DPAD_CENTER) {
+				if (_dpadCenterSkipUp) {
+					_dpadCenterSkipUp = false;
+					return;
+				}
+				// A DPAD ring cannot press center and a direction at once. So in games a long press keeps
+				// the button held after release, and the DPAD moves the cursor meanwhile (eg. onto a verb
+				// of the Full Throttle verb coin, which only stays open while the button is held).
+				if (_dpadCenterLongPress && _engineRunning && !isOverlayVisible()) {
+					_dpadCenterLongPress = false;
+					_dpadCenterLatched = true;
+					return;
+				}
+			}
 			ev0.type = Common::EVENT_JOYBUTTON_UP;
 			break;
 		default:
