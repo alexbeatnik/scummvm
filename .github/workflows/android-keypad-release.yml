@@ -1,0 +1,169 @@
+name: Android keypad mod release
+
+# Push a tag like v2026.3.0-keypad1 - or run this workflow by hand and type the tag -
+# to build the Android APK of the keypad mod and publish it as a GitHub release.
+on:
+  push:
+    tags:
+      - "v*-keypad*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, e.g. v2026.3.0-keypad1 (created if missing)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-keypad-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & publish APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      # configure insists on the NDK version named in dists/android/build.gradle.
+      NDK_VERSION: "23.2.8568313"
+      OBOE_VERSION: "1.10.0"
+      LIBPNG_VERSION: "1.6.47"
+      FREETYPE_VERSION: "2.13.3"
+      SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then TAG="$INPUT_TAG"; else TAG="$GITHUB_REF_NAME"; fi
+          if ! [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.-]*-keypad[0-9A-Za-z.]*$ ]]; then
+            echo "::error::Tag '$TAG' should look like v2026.3.0-keypad1"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;$NDK_VERSION"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      # The static libraries of the official toolchain that this build uses: Oboe (audio output,
+      # required), libpng and FreeType (the launcher theme and its fonts).
+      - name: Build static libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/deps"
+          COMMON=(
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX"
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF
+          )
+          mkdir -p "$RUNNER_TEMP/src" "$PREFIX/lib/pkgconfig" "$PREFIX/include"
+          cd "$RUNNER_TEMP/src"
+          curl -fsSL -o oboe.tar.gz "https://github.com/google/oboe/archive/refs/tags/$OBOE_VERSION.tar.gz"
+          curl -fsSL -o libpng.tar.gz "https://github.com/pnggroup/libpng/archive/refs/tags/v$LIBPNG_VERSION.tar.gz"
+          curl -fsSL -o freetype.tar.gz "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.gz"
+          for f in *.tar.gz; do tar xzf "$f"; done
+
+          # Oboe's install rule targets lib/<abi>, so copy the pieces by hand.
+          cmake -S "oboe-$OBOE_VERSION" -B build-oboe "${COMMON[@]}"
+          cmake --build build-oboe -j"$(nproc)"
+          cp build-oboe/liboboe.a "$PREFIX/lib/"
+          cp -r "oboe-$OBOE_VERSION/include/oboe" "$PREFIX/include/"
+
+          cmake -S "libpng-$LIBPNG_VERSION" -B build-png "${COMMON[@]}" \
+            -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_TESTS=OFF -DPNG_TOOLS=OFF
+          cmake --build build-png --target install -j"$(nproc)"
+
+          cmake -S "freetype-$FREETYPE_VERSION" -B build-ft "${COMMON[@]}" \
+            -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_PNG=ON -DFT_DISABLE_HARFBUZZ=ON \
+            -DFT_DISABLE_BROTLI=ON -DFT_REQUIRE_ZLIB=ON
+          cmake --build build-ft --target install -j"$(nproc)"
+
+          # zlib ships with Android but has no pkg-config file, and the two libraries above ask for one.
+          printf 'Name: zlib\nDescription: zlib from the Android NDK\nVersion: 1.2.11\nLibs: -lz\nCflags:\n' \
+            > "$PREFIX/lib/pkgconfig/zlib.pc"
+          ls -la "$PREFIX/lib" "$PREFIX/lib/pkgconfig"
+          echo "DEPS_PREFIX=$PREFIX" >> "$GITHUB_ENV"
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir build-android && cd build-android
+          CXXFLAGS="-I$DEPS_PREFIX/include" LDFLAGS="-L$DEPS_PREFIX/lib" \
+          PKG_CONFIG_LIBDIR="$DEPS_PREFIX/lib/pkgconfig" \
+            ../configure --host=android-arm64-v8a --enable-release
+          # The launcher theme needs both; fail now rather than ship a plain-looking build.
+          grep -q "^USE_PNG = 1" config.mk
+          grep -q "^USE_FREETYPE2 = 1" config.mk
+
+      - name: Build libscummvm.so
+        working-directory: build-android
+        run: make -j"$(nproc)" libscummvm.so
+
+      - name: Package the APK
+        working-directory: build-android
+        run: make ScummVM-release-unsigned.apk
+
+      - name: Sign the APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          KS="$RUNNER_TEMP/release.keystore"
+          if [ -n "${SIGNING_KEYSTORE_BASE64:-}" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            export KS_PASS="$SIGNING_STORE_PASSWORD" KEY_PASS="$SIGNING_KEY_PASSWORD"
+            ALIAS="$SIGNING_KEY_ALIAS"
+          else
+            echo "::warning::SIGNING_* secrets are not set; the APK is signed with a throwaway key and cannot update an already installed copy."
+            export KS_PASS=android KEY_PASS=android
+            ALIAS=androiddebugkey
+            keytool -genkeypair -keystore "$KS" -storepass "$KS_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          mkdir -p dist
+          "$BT/apksigner" sign --ks "$KS" --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
+            --ks-key-alias "$ALIAS" --out "dist/ScummVM-${VERSION}-arm64-v8a.apk" \
+            build-android/ScummVM-release-unsigned.apk
+          rm -f dist/*.idsig
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          ls -la dist
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ScummVM ${{ steps.tag.outputs.version }} (keypad mod)
+          body: |
+            Unofficial ScummVM build for keypad Android phones (alexbeatnik mod), not an
+            official ScummVM release. See the README for what it changes. 64-bit ARM only.
+          prerelease: false
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
