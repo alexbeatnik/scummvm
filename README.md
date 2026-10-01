@@ -1,5 +1,19 @@
 # [ScummVM README](https://www.scummvm.org/) · [![Translation status](https://translations.scummvm.org/widgets/scummvm/-/scummvm/svg-badge.svg)](https://translations.scummvm.org/engage/scummvm/?utm_source=widget) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md#pull-requests)
 
+## alexbeatnik mod for keypad phones
+
+This branch is an **unofficial** Android build of ScummVM for keypad phones (made for the Rongyue E5: Android 13, 320×480, D-pad and soft keys, a touchscreen you would rather not use). It is not affiliated with or endorsed by the ScummVM Team; for the official ScummVM go to [scummvm.org](https://www.scummvm.org/). The source is ScummVM 2026.3.0 plus the changes below, under the same license (GPL v3 or later). Ready APKs are in [Releases](https://github.com/alexbeatnik/scummvm/releases); the version carries a `-keypadN` suffix and the About dialog says it is the mod.
+
+What the mod changes (Android backend only):
+
+* **The D-pad drives the mouse cursor in games**, as it already did in the launcher. Stock ScummVM maps it to the keypad arrows there, which point-and-click games ignore.
+* **D-pad center is the left click, `#` the right click** (the inventory in Full Throttle, for instance).
+* **A long press of D-pad center keeps the button held** until the next press. A D-pad cannot press center and a direction at once, and this is how a verb is picked from a verb coin: hold center, move to the verb, press center.
+* Key repeats of gamepad buttons are ignored, so a held button is not a burst of clicks.
+* Engines with their own D-pad bindings keep them (the Full Throttle bike fights, for example).
+
+Sibling apps for the same phone: [JoyAmp](https://github.com/alexbeatnik/JoyAmp), [JoyBook](https://github.com/alexbeatnik/JoyBook), [JoyWeb](https://github.com/alexbeatnik/JoyWeb), [Call Touch Lock](https://github.com/alexbeatnik/CallTouchLock), [NetSwitch](https://github.com/alexbeatnik/NetSwitch).
+
 ## About ScummVM
 
 ScummVM allows you to play classic graphic point-and-click adventure games, text adventure games, and RPGs, as long as you already have the game data files. ScummVM replaces the executable files shipped with the games, which means you can now play your favorite games on all your favorite devices.

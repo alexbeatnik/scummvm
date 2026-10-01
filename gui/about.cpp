@@ -123,6 +123,12 @@ void AboutDialog::buildLines() {
 	#endif
 	addLine(Common::U32String("C2") + date);
 
+#ifdef __ANDROID__
+	// This Android build is a modified version, not an official ScummVM release (see README.md).
+	addLine(Common::U32String("C1""alexbeatnik mod for keypad phones (unofficial)"));
+	addLine(Common::U32String("C0""https://github.com/alexbeatnik/scummvm"));
+#endif
+
 	for (i = 0; i < ARRAYSIZE(copyright_text); i++)
 		addLine(Common::U32String(copyright_text[i]));
 

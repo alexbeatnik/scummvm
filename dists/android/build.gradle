@@ -33,8 +33,10 @@ android {
         // R8 configuration files.
         proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), srcProperties['srcdir'] + '/dists/android/proguard-rules.pro'
 
-        versionName "2026.2.1"
-        versionCode 26021000
+        // alexbeatnik's mod for keypad phones: "-keypadN" is its N-th release on top of ScummVM 2026.3.0.
+        // The build number digits (bb) carry N, so the mod installs over the release it is based on.
+        versionName "2026.3.0-keypad1"
+        versionCode 26030012
         // versioncode must be incremented for each market upload
         // maximum versioncode allowed by Play Store is: 2100000000
         // After 2.9.1.1 release the versioncode numbering scheme changed to reflect the post-2026 naming convention for ScummVM versions.
