@@ -161,7 +161,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ScummVM ${{ steps.tag.outputs.version }} (keypad mod)
           body: |
-            Unofficial ScummVM build for keypad Android phones (alexbeatnik mod), not an
+            Unofficial ScummVM build for keypad Android phones (alexbeatnik's mod), not an
             official ScummVM release. See the README for what it changes. 64-bit ARM only.
           prerelease: false
           files: |

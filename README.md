@@ -1,6 +1,6 @@
 # [ScummVM README](https://www.scummvm.org/) · [![Translation status](https://translations.scummvm.org/widgets/scummvm/-/scummvm/svg-badge.svg)](https://translations.scummvm.org/engage/scummvm/?utm_source=widget) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md#pull-requests)
 
-## alexbeatnik mod for keypad phones
+## alexbeatnik's mod for keypad phones
 
 This branch is an **unofficial** Android build of ScummVM for keypad phones (made for the Rongyue E5: Android 13, 320×480, D-pad and soft keys, a touchscreen you would rather not use). It is not affiliated with or endorsed by the ScummVM Team; for the official ScummVM go to [scummvm.org](https://www.scummvm.org/). The source is ScummVM 2026.3.0 plus the changes below, under the same license (GPL v3 or later). Ready APKs are in [Releases](https://github.com/alexbeatnik/scummvm/releases); the version carries a `-keypadN` suffix and the About dialog says it is the mod.
 
